@@ -126,7 +126,13 @@ extensions.getByType<KotlinMultiplatformExtension>().targets.withType<KotlinNati
         includeDirs("src/nativeInterop/cinterop/include")
         extraOpts("-libraryPath", output.get().asFile.absolutePath)
     }
-    tasks.matching { it.name == "cinteropKAudioOutput$suffix" }.configureEach { dependsOn(pack, generateDefinition); inputs.file(archive) }
+    tasks.matching { it.name == "cinteropKAudioOutput$suffix" }.configureEach {
+        // Metadata commonization schedules cinterops for other hosts as well.
+        // A skipped native archive must not leave a required, missing input.
+        onlyIf { bridgeBuildable || prebuilt != null }
+        dependsOn(pack, generateDefinition)
+        inputs.file(archive)
+    }
 }
 
 apply(from = rootProject.file("gradle/jvm-native.gradle.kts"))

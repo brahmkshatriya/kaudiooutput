@@ -90,6 +90,13 @@ jobs:
         if: matrix.id == 'linux-aarch64'
         shell: bash
         run: ./gradlew --no-daemon --stacktrace --no-configuration-cache :lib:archiveAudioOutputLinuxArm64
+      - name: Build Kotlin/Native Windows bridge
+        if: matrix.id == 'windows-x86_64'
+        shell: bash
+        env:
+          KAUDIOOUTPUT_MINGW_X64_CC: gcc
+          KAUDIOOUTPUT_MINGW_X64_AR: ar
+        run: ./gradlew --no-daemon --stacktrace --no-configuration-cache :lib:archiveAudioOutputMingwX64
       - uses: actions/upload-artifact@v4
         with:
           name: kaudiooutput-jvm-native-${{ matrix.id }}-${{ needs.prepare.outputs.version }}
@@ -101,6 +108,13 @@ jobs:
         with:
           name: kaudiooutput-native-linux-arm64-${{ needs.prepare.outputs.version }}
           path: lib/build/native/linuxArm64/libkaudiooutput.a
+          if-no-files-found: error
+          retention-days: 5
+      - uses: actions/upload-artifact@v4
+        if: matrix.id == 'windows-x86_64'
+        with:
+          name: kaudiooutput-native-mingw-x64-${{ needs.prepare.outputs.version }}
+          path: lib/build/native/mingwX64/libkaudiooutput.a
           if-no-files-found: error
           retention-days: 5
 
@@ -229,7 +243,7 @@ jobs:
 
   metadata:
     name: Build KMP root metadata shard
-    needs: prepare
+    needs: [prepare, bridges]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -243,10 +257,24 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes build-essential pkg-config libpulse-dev
+      - uses: actions/download-artifact@v4
+        with:
+          name: kaudiooutput-native-linux-arm64-${{ needs.prepare.outputs.version }}
+          path: build/prebuilt-linux-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: kaudiooutput-native-mingw-x64-${{ needs.prepare.outputs.version }}
+          path: build/prebuilt-mingw-x64
       - name: Build root publication
+        shell: bash
         env:
           ORG_GRADLE_PROJECT_VERSION_NAME: ${{ needs.prepare.outputs.version }}
-        run: ./gradlew --no-daemon --stacktrace --no-configuration-cache :lib:publishKotlinMultiplatformPublicationToReleaseShardRepository
+          KAUDIOOUTPUT_LINUX_ARM64_PREBUILT_ARCHIVE: ${{ github.workspace }}/build/prebuilt-linux-arm64/libkaudiooutput.a
+          KAUDIOOUTPUT_MINGW_X64_PREBUILT_ARCHIVE: ${{ github.workspace }}/build/prebuilt-mingw-x64/libkaudiooutput.a
+        run: |
+          test -s "$KAUDIOOUTPUT_LINUX_ARM64_PREBUILT_ARCHIVE"
+          test -s "$KAUDIOOUTPUT_MINGW_X64_PREBUILT_ARCHIVE"
+          ./gradlew --no-daemon --stacktrace --no-configuration-cache :lib:publishKotlinMultiplatformPublicationToReleaseShardRepository
       - uses: actions/upload-artifact@v4
         with:
           name: kaudiooutput-repo-metadata-${{ needs.prepare.outputs.version }}
