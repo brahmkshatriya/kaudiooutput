@@ -1,0 +1,7 @@
+headers = kaudiooutput.h
+headerFilter = kaudiooutput.h
+package = dev.brahmkshatriya.kaudiooutput.interop
+staticLibraries = libkaudiooutput.a
+linkerOpts.linux = -lpulse
+linkerOpts.mingw = -lshell32
+linkerOpts.osx = -framework Foundation -framework CoreAudio
