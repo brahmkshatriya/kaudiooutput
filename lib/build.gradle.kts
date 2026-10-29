@@ -46,7 +46,8 @@ kotlin {
 val konan = File(System.getProperty("user.home"), ".konan/dependencies")
 val hostOs = System.getProperty("os.name").lowercase()
 val hostArm = System.getProperty("os.arch") in setOf("arm64", "aarch64")
-val llvm = konan.listFiles()?.filter { it.name.matches(Regex("llvm-\\d+-x86_64-linux-essentials-.*")) }
+// Kotlin/Native may download LLVM after configuration on a fresh machine.
+fun konanLlvmBin() = konan.listFiles()?.filter { it.name.matches(Regex("llvm-\\d+-x86_64-linux-essentials-.*")) }
     ?.maxByOrNull { it.name.substringAfter("llvm-").substringBefore('-').toInt() }?.resolve("bin")
 
 extensions.getByType<KotlinMultiplatformExtension>().targets.withType<KotlinNativeTarget>().configureEach {
@@ -64,8 +65,8 @@ extensions.getByType<KotlinMultiplatformExtension>().targets.withType<KotlinNati
     val compilerOverride = providers.environmentVariable("KAUDIOOUTPUT_${stem}_CC")
     val archiverOverride = providers.environmentVariable("KAUDIOOUTPUT_${stem}_AR")
     val linuxX64Compiler = konan.resolve("x86_64-unknown-linux-gnu-gcc-8.3.0-glibc-2.19-kernel-4.9-2/bin/x86_64-unknown-linux-gnu-gcc")
-    val compiler = when {
-        windows && !hostOs.startsWith("windows") -> listOf(llvm?.resolve("clang")?.absolutePath ?: "clang", "--target=x86_64-w64-windows-gnu",
+    fun compiler() = when {
+        windows && !hostOs.startsWith("windows") -> listOf(konanLlvmBin()?.resolve("clang")?.absolutePath ?: "clang", "--target=x86_64-w64-windows-gnu",
             "--sysroot=${konan.resolve("msys2-mingw-w64-x86_64-2")}")
         mac -> listOf("clang", "-arch", if (name == "macosArm64") "arm64" else "x86_64", "-fobjc-arc")
         name == "linuxArm64" && !hostArm -> listOf(konan.resolve("aarch64-unknown-linux-gnu-gcc-8.3.0-glibc-2.25-kernel-4.9-2/bin/aarch64-unknown-linux-gnu-gcc").absolutePath)
@@ -85,11 +86,11 @@ extensions.getByType<KotlinMultiplatformExtension>().targets.withType<KotlinNati
         onlyIf { bridgeBuildable }
         dependsOn(headers)
         inputs.file(source); inputs.dir("src/nativeInterop/cinterop/include")
-        inputs.property("compiler", compilerOverride.orElse(compiler.joinToString(" ")))
+        inputs.property("compiler", compilerOverride.orElse(providers.provider { compiler().joinToString(" ") }))
         outputs.file(objectFile)
         doFirst {
             output.get().asFile.mkdirs()
-            commandLine((compilerOverride.orNull?.split(Regex("\\s+")) ?: compiler) +
+            commandLine((compilerOverride.orNull?.split(Regex("\\s+")) ?: compiler()) +
                 listOf("-O2", "-fPIC", "-Isrc/nativeInterop/cinterop/include", "-I${output.get().dir("include").asFile}",
                     "-c", source.absolutePath, "-o", objectFile.get().asFile.absolutePath))
         }
@@ -102,7 +103,7 @@ extensions.getByType<KotlinMultiplatformExtension>().targets.withType<KotlinNati
         onlyIf { bridgeBuildable }
         dependsOn(compile); inputs.file(objectFile); outputs.file(archive)
         doFirst {
-            commandLine(archiverOverride.orNull ?: if (windows) llvm?.resolve("llvm-ar")?.absolutePath ?: "llvm-ar" else "ar",
+            commandLine(archiverOverride.orNull ?: if (windows) konanLlvmBin()?.resolve("llvm-ar")?.absolutePath ?: "llvm-ar" else "ar",
                 "rcs", archive.get().asFile.absolutePath, objectFile.get().asFile.absolutePath)
         }
     }
