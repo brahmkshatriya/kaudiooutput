@@ -47,6 +47,15 @@ jobs:
       - name: Linux audio headers
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpulse-dev pkg-config
+      - name: Check Linux sink availability filtering
+        if: runner.os == 'Linux'
+        run: |
+          cc -std=gnu11 -Wall -Wextra -Werror \
+            -I lib/src/nativeInterop/cinterop/include \
+            scripts/test-linux-sink-availability.c \
+            -o /tmp/test-linux-sink-availability \
+            $(pkg-config --cflags --libs libpulse)
+          /tmp/test-linux-sink-availability
       - name: Build and test
         env:
           KAUDIOOUTPUT_JVM_CC: ${{ runner.os == 'Windows' && 'gcc' || 'cc' }}

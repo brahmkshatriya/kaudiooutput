@@ -84,6 +84,11 @@ static void route_all(kao_context *c) {
     if (c->ready) drop(pa_context_get_sink_input_info_list(c->pulse, route_input, c));
 }
 static void list_devices(kao_context *c);
+static int sink_is_available(const pa_sink_info *info) {
+    // PipeWire can expose unplugged HDMI/DisplayPort sinks even though the
+    // desktop sound picker hides them. Idle (suspended) sinks remain usable.
+    return !info->active_port || info->active_port->available != PA_PORT_AVAILABLE_NO;
+}
 static void sink(pa_context *p, const pa_sink_info *info, int end, void *user) {
     (void)p; kao_context *c = user;
     if (c->closing) return;
@@ -97,7 +102,7 @@ static void sink(pa_context *p, const pa_sink_info *info, int end, void *user) {
         if (c->list_again) { c->list_again = 0; list_devices(c); }
         return;
     }
-    if (!info) return;
+    if (!info || !sink_is_available(info)) return;
     device *d = calloc(1, sizeof *d); d->id = strdup(info->name); d->name = strdup(info->description ? info->description : info->name);
     const char *bus = pa_proplist_gets(info->proplist, PA_PROP_DEVICE_BUS);
     const char *port = info->active_port ? info->active_port->name : "";

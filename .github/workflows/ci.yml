@@ -31,6 +31,14 @@ jobs:
           sdk_platform="$(sed -n 's/^androidSdkPlatformVersion=//p' gradle.properties)"
           build_tools="$(sed -n 's/^androidBuildToolsVersion=//p' gradle.properties)"
           sdkmanager "platforms;android-$sdk_platform" "build-tools;$build_tools"
+      - name: Check Linux sink availability filtering
+        run: |
+          cc -std=gnu11 -Wall -Wextra -Werror \
+            -I lib/src/nativeInterop/cinterop/include \
+            scripts/test-linux-sink-availability.c \
+            -o /tmp/test-linux-sink-availability \
+            $(pkg-config --cflags --libs libpulse)
+          /tmp/test-linux-sink-availability
       - name: Check library and local publications
         run: |
           ./gradlew --no-daemon --stacktrace --no-configuration-cache \

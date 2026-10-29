@@ -11,7 +11,7 @@ Add `mavenCentral()` and `google()` to your dependency repositories, then add th
 
 ```kotlin
 commonMain.dependencies {
-    implementation("dev.brahmkshatriya.kaudiooutput:lib:0.1.0")
+    implementation("dev.brahmkshatriya.kaudiooutput:lib:0.1.1")
 }
 ```
 
